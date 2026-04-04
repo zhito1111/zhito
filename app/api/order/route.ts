@@ -27,6 +27,20 @@ type OrderItemInput = {
   amount: number
 }
 
+type NormalizedOrderItem = {
+  product: string
+  volume: string
+  amount: number
+  unitPrice: number
+  totalPrice: number
+}
+
+type OrderRequestBody = {
+  name?: unknown
+  phone?: unknown
+  items?: unknown
+}
+
 function normalizePhone(phone: string): string | null {
   const digits = String(phone || "").replace(/\D/g, "")
 
@@ -82,14 +96,35 @@ function resolvePaymentUrl(
   }
 }
 
+function isOrderItemInput(value: unknown): value is OrderItemInput {
+  if (!value || typeof value !== "object") {
+    return false
+  }
+
+  const item = value as Record<string, unknown>
+
+  return (
+    typeof item.product === "string" &&
+    typeof item.volume === "string" &&
+    (typeof item.amount === "number" || typeof item.amount === "string")
+  )
+}
+
 export async function POST(req: Request) {
   try {
-    const body = await req.json()
+    const body: OrderRequestBody = await req.json()
     console.log("ORDER BODY:", body)
 
     const name = String(body.name || "").trim()
     const rawPhone = String(body.phone || "").trim()
-    const items = Array.isArray(body.items) ? body.items : []
+
+    const rawItems: OrderItemInput[] = Array.isArray(body.items)
+      ? body.items.filter(isOrderItemInput).map((item) => ({
+          product: item.product,
+          volume: item.volume,
+          amount: Number(item.amount),
+        }))
+      : []
 
     if (!name) {
       return NextResponse.json(
@@ -110,7 +145,7 @@ export async function POST(req: Request) {
       )
     }
 
-    if (!items.length) {
+    if (!rawItems.length) {
       return NextResponse.json(
         {
           success: false,
@@ -120,14 +155,14 @@ export async function POST(req: Request) {
       )
     }
 
-    const normalizedItems = items.map((item: OrderItemInput) => {
+    const normalizedItems: NormalizedOrderItem[] = rawItems.map((item) => {
       const product = String(item.product || "").trim()
       const volume = String(item.volume || "").trim()
       const amount = Math.max(1, Number(item.amount) || 1)
 
       const unitPrice = catalog[product]?.[volume]
 
-      if (!product || !volume || !unitPrice) {
+      if (!product || !volume || typeof unitPrice !== "number") {
         throw new Error("Неверный товар, объём или количество")
       }
 
@@ -140,7 +175,7 @@ export async function POST(req: Request) {
       }
     })
 
-    const totalPrice = normalizedItems.reduce(
+    const totalPrice = normalizedItems.reduce<number>(
       (sum, item) => sum + item.totalPrice,
       0
     )
@@ -173,9 +208,7 @@ export async function POST(req: Request) {
     console.log("ORDER CREATED:", order)
 
     const paymentDescription = normalizedItems
-      .map(
-        (item) => `${item.product}, ${item.volume}, ${item.amount} шт.`
-      )
+      .map((item) => `${item.product}, ${item.volume}, ${item.amount} шт.`)
       .join("; ")
 
     const payment = await createPayment({
@@ -235,7 +268,7 @@ ${itemsText}
 
 ${safePaymentUrl}`
 
-    let telegramResult = { ok: false }
+    let telegramResult: { ok: boolean } = { ok: false }
 
     try {
       telegramResult = await sendTelegramMessage(message)
