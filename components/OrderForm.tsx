@@ -33,6 +33,54 @@ const products = Object.keys(catalog)
 const initialProduct = products[0]
 const initialVolume = Object.keys(catalog[initialProduct])[0]
 
+function formatRussianPhone(value: string) {
+  const digits = value.replace(/\D/g, "")
+
+  if (!digits) return ""
+
+  let normalized = digits
+
+  if (normalized[0] === "8") {
+    normalized = "7" + normalized.slice(1)
+  } else if (normalized[0] !== "7") {
+    normalized = "7" + normalized
+  }
+
+  normalized = normalized.slice(0, 11)
+
+  const country = normalized[0]
+  const code = normalized.slice(1, 4)
+  const first = normalized.slice(4, 7)
+  const second = normalized.slice(7, 9)
+  const third = normalized.slice(9, 11)
+
+  let result = `+${country}`
+
+  if (code) result += ` (${code}`
+  if (code.length === 3) result += `)`
+  if (first) result += ` ${first}`
+  if (second) result += `-${second}`
+  if (third) result += `-${third}`
+
+  return result
+}
+
+function normalizePhoneForSubmit(value: string) {
+  const digits = value.replace(/\D/g, "")
+
+  if (!digits) return ""
+
+  let normalized = digits
+
+  if (normalized[0] === "8") {
+    normalized = "7" + normalized.slice(1)
+  } else if (normalized[0] !== "7") {
+    normalized = "7" + normalized
+  }
+
+  return normalized.slice(0, 11)
+}
+
 export default function OrderForm() {
   const [name, setName] = useState("")
   const [phone, setPhone] = useState("")
@@ -84,6 +132,11 @@ export default function OrderForm() {
     setAmount(Math.max(1, Number(digitsOnly)))
   }
 
+  function handlePhoneChange(value: string) {
+    if (loading) return
+    setPhone(formatRussianPhone(value))
+  }
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (loading) return
@@ -93,6 +146,12 @@ export default function OrderForm() {
     setLoading(true)
 
     try {
+      const normalizedPhone = normalizePhoneForSubmit(phone)
+
+      if (normalizedPhone.length !== 11) {
+        throw new Error("Введите корректный номер телефона РФ")
+      }
+
       const res = await fetch("/api/order", {
         method: "POST",
         headers: {
@@ -100,7 +159,7 @@ export default function OrderForm() {
         },
         body: JSON.stringify({
           name: name.trim(),
-          phone: phone.trim(),
+          phone: normalizedPhone,
           product,
           volume,
           amount,
@@ -179,11 +238,12 @@ export default function OrderForm() {
               type="tel"
               inputMode="tel"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => handlePhoneChange(e.target.value)}
               placeholder="+7 (999) 123-45-67"
               className="w-full rounded-2xl border border-neutral-300 px-4 py-3 outline-none transition focus:border-neutral-900 disabled:cursor-not-allowed disabled:opacity-60"
               required
               disabled={loading}
+              maxLength={18}
             />
           </div>
         </div>
