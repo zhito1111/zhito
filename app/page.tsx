@@ -3,8 +3,8 @@ import OrderForm from "@/components/OrderForm"
 export default function Home() {
   return (
     <main className="min-h-screen bg-neutral-50 text-neutral-900">
-      <section className="border-b border-neutral-200 bg-gradient-to-b from-amber-50 to-neutral-50 px-6 py-14">
-        <div className="mx-auto grid max-w-6xl gap-10 md:grid-cols-2 md:items-center">
+      <section className="border-b border-neutral-200 bg-gradient-to-b from-amber-50 to-neutral-50 px-4 py-10 sm:px-6 sm:py-14">
+        <div className="mx-auto grid max-w-6xl gap-8 md:grid-cols-2 md:items-center md:gap-10">
           <div>
             <span className="inline-flex rounded-full border border-amber-200 bg-white px-4 py-1 text-sm font-medium text-amber-700 shadow-sm">
               Свежий отжим под заказ
@@ -64,33 +64,33 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="rounded-[32px] border border-amber-100 bg-white p-5 shadow-lg">
-            <div className="overflow-hidden rounded-[28px] bg-gradient-to-br from-amber-100 via-orange-50 to-lime-50 p-6">
-              <div className="aspect-[4/5] rounded-[24px] border border-white/70 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.9),_rgba(255,255,255,0.35))] p-6 shadow-inner">
-                <div className="flex h-full flex-col justify-between rounded-[20px] border border-amber-200/60 bg-white/70 p-6 backdrop-blur">
+          <div className="rounded-[28px] border border-amber-100 bg-white p-4 shadow-lg sm:rounded-[32px] sm:p-5">
+            <div className="overflow-hidden rounded-[24px] bg-gradient-to-br from-amber-100 via-orange-50 to-lime-50 p-4 sm:rounded-[28px] sm:p-6">
+              <div className="rounded-[22px] border border-white/70 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.9),_rgba(255,255,255,0.35))] p-4 shadow-inner sm:rounded-[24px] sm:p-6">
+                <div className="flex flex-col gap-5 rounded-[18px] border border-amber-200/60 bg-white/70 p-4 backdrop-blur sm:rounded-[20px] sm:gap-6 sm:p-6">
                   <div>
                     <img
                       src="/images/main.jpg"
                       alt="Масло холодного отжима"
-                      className="mb-4 h-56 w-full rounded-2xl object-cover"
+                      className="mb-4 h-48 w-full rounded-2xl object-cover sm:h-56"
                     />
-                    <p className="text-sm font-semibold uppercase tracking-wide text-amber-700">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 sm:text-sm">
                       Авторское производство
                     </p>
-                    <h2 className="mt-3 text-2xl font-bold">
+                    <h2 className="mt-3 text-3xl font-bold leading-tight sm:text-2xl">
                       Масло для ежедневной пользы и вкуса
                     </h2>
-                    <p className="mt-3 text-sm leading-6 text-neutral-600">
+                    <p className="mt-3 text-base leading-7 text-neutral-600 sm:text-sm sm:leading-6">
                       Для салатов, каш, восстановления после нагрузок и
                       поддержания здорового рациона.
                     </p>
                   </div>
 
                   <div className="grid gap-3">
-                    <div className="rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm">
+                    <div className="rounded-2xl border border-amber-200 bg-white px-4 py-3 text-base leading-7 sm:text-sm sm:leading-6">
                       Льняное масло → Омега-3, ежедневная поддержка организма
                     </div>
-                    <div className="rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm">
+                    <div className="rounded-2xl border border-amber-200 bg-white px-4 py-3 text-base leading-7 sm:text-sm sm:leading-6">
                       Тыквенное масло → мягкая поддержка печени и ЖКТ
                     </div>
                     <a
@@ -107,7 +107,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="catalog" className="px-6 py-14">
+      <section id="catalog" className="px-4 py-10 sm:px-6 sm:py-14">
         <div className="mx-auto max-w-6xl">
           <div className="max-w-2xl">
             <h2 className="text-3xl font-bold md:text-4xl">Ассортимент</h2>
@@ -230,7 +230,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="benefits" className="border-y border-neutral-200 bg-white px-6 py-14">
+      <section id="benefits" className="border-y border-neutral-200 bg-white px-4 py-10 sm:px-6 sm:py-14">
         <div className="mx-auto max-w-6xl">
           <div className="max-w-2xl">
             <h2 className="text-3xl font-bold md:text-4xl">
@@ -274,7 +274,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="px-6 py-14">
+      <section className="px-4 py-10 sm:px-6 sm:py-14">
         <div className="mx-auto grid max-w-6xl gap-6 md:grid-cols-2">
           <div className="rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm">
             <h2 className="text-2xl font-semibold">Как это работает</h2>
@@ -311,7 +311,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="bg-neutral-900 px-6 py-14 text-white">
+      <section className="bg-neutral-900 px-4 py-10 text-white sm:px-6 sm:py-14">
         <div className="mx-auto max-w-6xl rounded-[32px] border border-white/10 bg-white/5 p-8">
           <div className="grid gap-6 md:grid-cols-[1.2fr_0.8fr] md:items-center">
             <div>
@@ -342,7 +342,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="order" className="px-6 py-14">
+      <section id="order" className="px-4 py-10 sm:px-6 sm:py-14">
         <div className="mx-auto max-w-6xl">
           <div className="mb-6 max-w-2xl">
             <h2 className="text-3xl font-bold md:text-4xl">Оформить заказ</h2>
