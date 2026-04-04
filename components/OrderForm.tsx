@@ -29,6 +29,15 @@ const productDescriptions: Record<string, string> = {
     "Более насыщенный вкус и аромат. Часто выбирают для салатов, овощных блюд и разнообразия рациона.",
 }
 
+type CartItem = {
+  id: string
+  product: string
+  volume: string
+  amount: number
+  unitPrice: number
+  totalPrice: number
+}
+
 const products = Object.keys(catalog)
 const initialProduct = products[0]
 const initialVolume = Object.keys(catalog[initialProduct])[0]
@@ -87,6 +96,7 @@ export default function OrderForm() {
   const [product, setProduct] = useState(initialProduct)
   const [volume, setVolume] = useState(initialVolume)
   const [amount, setAmount] = useState(1)
+  const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
@@ -99,9 +109,13 @@ export default function OrderForm() {
     return catalog[product]?.[volume] || 0
   }, [product, volume])
 
-  const totalPrice = useMemo(() => {
+  const previewTotalPrice = useMemo(() => {
     return unitPrice * amount
   }, [unitPrice, amount])
+
+  const cartTotalPrice = useMemo(() => {
+    return cartItems.reduce((sum, item) => sum + item.totalPrice, 0)
+  }, [cartItems])
 
   function handleProductChange(nextProduct: string) {
     const nextVolumes = Object.keys(catalog[nextProduct] || {})
@@ -137,6 +151,37 @@ export default function OrderForm() {
     setPhone(formatRussianPhone(value))
   }
 
+  function addToCart() {
+    if (loading) return
+
+    const currentUnitPrice = catalog[product]?.[volume]
+
+    if (!currentUnitPrice) {
+      setError("Не удалось добавить товар")
+      return
+    }
+
+    setError("")
+    setSuccessMessage("")
+
+    const newItem: CartItem = {
+      id: `${product}-${volume}-${Date.now()}`,
+      product,
+      volume,
+      amount,
+      unitPrice: currentUnitPrice,
+      totalPrice: currentUnitPrice * amount,
+    }
+
+    setCartItems((prev) => [...prev, newItem])
+    setAmount(1)
+  }
+
+  function removeFromCart(id: string) {
+    if (loading) return
+    setCartItems((prev) => prev.filter((item) => item.id !== id))
+  }
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (loading) return
@@ -152,6 +197,10 @@ export default function OrderForm() {
         throw new Error("Введите корректный номер телефона РФ")
       }
 
+      if (!cartItems.length) {
+        throw new Error("Добавьте хотя бы один товар в заказ")
+      }
+
       const res = await fetch("/api/order", {
         method: "POST",
         headers: {
@@ -160,9 +209,11 @@ export default function OrderForm() {
         body: JSON.stringify({
           name: name.trim(),
           phone: normalizedPhone,
-          product,
-          volume,
-          amount,
+          items: cartItems.map((item) => ({
+            product: item.product,
+            volume: item.volume,
+            amount: item.amount,
+          })),
         }),
       })
 
@@ -203,8 +254,8 @@ export default function OrderForm() {
             Оформить заказ
           </h2>
           <p className="mt-2 max-w-2xl text-neutral-600">
-            Выберите масло, объём и количество. После оформления мы сразу
-            принимаем заказ в работу и показываем следующий шаг.
+            Соберите заказ из нескольких масел, проверьте состав и отправьте
+            заявку одним разом.
           </p>
         </div>
 
@@ -373,7 +424,7 @@ export default function OrderForm() {
         <div className="grid gap-4 md:grid-cols-[1.2fr_0.8fr]">
           <div className="rounded-3xl bg-neutral-100 p-5">
             <p className="text-sm font-semibold text-neutral-900">
-              Вы выбрали
+              Текущая позиция
             </p>
             <div className="mt-3 space-y-2 text-sm text-neutral-700">
               <div className="flex items-center justify-between gap-4">
@@ -399,16 +450,82 @@ export default function OrderForm() {
 
             <div className="mt-3 border-t border-neutral-200 pt-3">
               <div className="flex items-center justify-between text-lg font-semibold text-neutral-900">
-                <span>Итого</span>
-                <span>{totalPrice} ₽</span>
+                <span>Сумма позиции</span>
+                <span>{previewTotalPrice} ₽</span>
               </div>
             </div>
 
-            <p className="mt-3 text-xs leading-5 text-neutral-500">
-              После оформления вы увидите подтверждение, что заказ принят в
-              работу.
-            </p>
+            <button
+              type="button"
+              onClick={addToCart}
+              disabled={loading}
+              className="mt-4 w-full rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-neutral-900 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Добавить в заказ
+            </button>
           </div>
+        </div>
+
+        <div className="rounded-3xl border border-neutral-200 bg-neutral-50 p-5">
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm font-semibold text-neutral-900">
+              Ваш заказ
+            </p>
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-neutral-700 shadow-sm">
+              {cartItems.length} поз.
+            </span>
+          </div>
+
+          {cartItems.length ? (
+            <div className="mt-4 space-y-3">
+              {cartItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="rounded-2xl border border-neutral-200 bg-white p-4"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="font-semibold text-neutral-900">
+                        {item.product}
+                      </p>
+                      <p className="mt-1 text-sm text-neutral-600">
+                        {item.volume} · {item.amount} шт.
+                      </p>
+                      <p className="mt-1 text-sm text-neutral-600">
+                        {item.unitPrice} ₽ за 1 шт.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3 sm:flex-col sm:items-end">
+                      <p className="text-base font-semibold text-neutral-900">
+                        {item.totalPrice} ₽
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => removeFromCart(item.id)}
+                        disabled={loading}
+                        className="text-sm font-medium text-red-600 transition hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Удалить
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              <div className="rounded-2xl border border-neutral-200 bg-white p-4">
+                <div className="flex items-center justify-between text-lg font-semibold text-neutral-900">
+                  <span>Итого по заказу</span>
+                  <span>{cartTotalPrice} ₽</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-neutral-500">
+              Пока ничего не добавлено. Выберите масло, объём и нажмите
+              «Добавить в заказ».
+            </p>
+          )}
         </div>
 
         {successMessage ? (
@@ -425,10 +542,10 @@ export default function OrderForm() {
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !cartItems.length}
           className="w-full touch-manipulation rounded-2xl bg-black px-4 py-4 text-base font-medium text-white transition hover:opacity-90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {loading ? "Оформляем заказ..." : "Оформить заказ"}
+          {loading ? "Оформляем заказ..." : "Оформить весь заказ"}
         </button>
       </form>
     </section>

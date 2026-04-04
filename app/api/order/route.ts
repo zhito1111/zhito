@@ -21,6 +21,12 @@ const catalog: Record<string, Record<string, number>> = {
   },
 }
 
+type OrderItemInput = {
+  product: string
+  volume: string
+  amount: number
+}
+
 function normalizePhone(phone: string): string | null {
   const digits = String(phone || "").replace(/\D/g, "")
 
@@ -83,9 +89,7 @@ export async function POST(req: Request) {
 
     const name = String(body.name || "").trim()
     const rawPhone = String(body.phone || "").trim()
-    const product = String(body.product || "").trim()
-    const volume = String(body.volume || "").trim()
-    const amount = Math.max(1, Number(body.amount ?? body.quantity) || 1)
+    const items = Array.isArray(body.items) ? body.items : []
 
     if (!name) {
       return NextResponse.json(
@@ -106,19 +110,41 @@ export async function POST(req: Request) {
       )
     }
 
-    const unitPrice = catalog[product]?.[volume]
-
-    if (!unitPrice) {
+    if (!items.length) {
       return NextResponse.json(
         {
           success: false,
-          error: "Неверный товар или объём",
+          error: "Добавьте хотя бы один товар в заказ",
         },
         { status: 400 }
       )
     }
 
-    const totalPrice = unitPrice * amount
+    const normalizedItems = items.map((item: OrderItemInput) => {
+      const product = String(item.product || "").trim()
+      const volume = String(item.volume || "").trim()
+      const amount = Math.max(1, Number(item.amount) || 1)
+
+      const unitPrice = catalog[product]?.[volume]
+
+      if (!product || !volume || !unitPrice) {
+        throw new Error("Неверный товар, объём или количество")
+      }
+
+      return {
+        product,
+        volume,
+        amount,
+        unitPrice,
+        totalPrice: unitPrice * amount,
+      }
+    })
+
+    const totalPrice = normalizedItems.reduce(
+      (sum, item) => sum + item.totalPrice,
+      0
+    )
+
     const orderNumber = Date.now().toString()
     const siteUrl = new URL(req.url).origin
 
@@ -127,21 +153,35 @@ export async function POST(req: Request) {
         orderNumber,
         name,
         phone,
-        product,
-        volume,
-        amount,
-        unitPrice,
         totalPrice,
         status: "new",
+        items: {
+          create: normalizedItems.map((item) => ({
+            product: item.product,
+            volume: item.volume,
+            amount: item.amount,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice,
+          })),
+        },
+      },
+      include: {
+        items: true,
       },
     })
 
     console.log("ORDER CREATED:", order)
 
+    const paymentDescription = normalizedItems
+      .map(
+        (item) => `${item.product}, ${item.volume}, ${item.amount} шт.`
+      )
+      .join("; ")
+
     const payment = await createPayment({
       amount: totalPrice,
       orderNumber: order.orderNumber,
-      description: `Заказ ${order.orderNumber}: ${product}, ${volume}, ${amount} шт.`,
+      description: `Заказ ${order.orderNumber}: ${paymentDescription}`,
       siteUrl,
     })
 
@@ -159,23 +199,34 @@ export async function POST(req: Request) {
         paymentId: payment.paymentId,
         paymentUrl: finalPaymentUrl,
       },
+      include: {
+        items: true,
+      },
     })
 
     const safeName = escapeHtml(updatedOrder.name)
     const safePhone = escapeHtml(updatedOrder.phone)
-    const safeProduct = escapeHtml(updatedOrder.product)
-    const safeVolume = escapeHtml(updatedOrder.volume)
     const safePaymentUrl = escapeHtml(updatedOrder.paymentUrl || "#")
+
+    const itemsText = updatedOrder.items
+      .map((item, index) => {
+        return `${index + 1}. <b>${escapeHtml(item.product)}</b>
+   • Объём: ${escapeHtml(item.volume)}
+   • Кол-во: ${item.amount}
+   • Цена за 1 шт.: ${item.unitPrice} ₽
+   • Сумма: ${item.totalPrice} ₽`
+      })
+      .join("\n\n")
 
     const message = `🔥 <b>Новый заказ</b>
 
 🧾 <b>Номер заказа:</b> ${updatedOrder.orderNumber}
 👤 <b>Имя:</b> ${safeName}
 📞 <b>Телефон:</b> ${safePhone}
-📦 <b>Товар:</b> ${safeProduct}
-🫙 <b>Объём:</b> ${safeVolume}
-💵 <b>Цена за 1 шт:</b> ${updatedOrder.unitPrice} ₽
-🔢 <b>Кол-во:</b> ${updatedOrder.amount}
+
+📦 <b>Состав заказа:</b>
+${itemsText}
+
 💰 <b>Итого:</b> ${updatedOrder.totalPrice} ₽
 📌 <b>Статус:</b> ${updatedOrder.status}
 
@@ -196,7 +247,6 @@ ${safePaymentUrl}`
     return NextResponse.json({
       success: true,
       order: updatedOrder,
-      unitPrice,
       totalPrice,
       paymentUrl: finalPaymentUrl,
       telegramSent: telegramResult.ok,

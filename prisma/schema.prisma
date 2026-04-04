@@ -8,23 +8,35 @@ datasource db {
 }
 
 model Order {
-  id          Int      @id @default(autoincrement())
-  orderNumber String   @unique
+  id          Int         @id @default(autoincrement())
+  orderNumber String      @unique
 
   name        String
   phone       String
-  product     String
-  volume      String
-  amount      Int
 
-  unitPrice   Int
   totalPrice  Int
+  status      String      @default("new")
 
-  status      String   @default("new")
-
-  paymentId   String?  @unique
+  paymentId   String?     @unique
   paymentUrl  String?
   paidAt      DateTime?
 
-  createdAt   DateTime @default(now())
+  createdAt   DateTime    @default(now())
+
+  items       OrderItem[]
+}
+
+model OrderItem {
+  id         Int      @id @default(autoincrement())
+
+  orderId    Int
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  product    String
+  volume     String
+  amount     Int
+  unitPrice  Int
+  totalPrice Int
+
+  createdAt  DateTime @default(now())
 }
