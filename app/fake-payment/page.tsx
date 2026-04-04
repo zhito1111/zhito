@@ -1,13 +1,17 @@
 type FakePaymentPageProps = {
-  searchParams?: {
+  searchParams?: Promise<{
     order?: string
-  }
+  }>
 }
 
-export default function FakePaymentPage({
+export default async function FakePaymentPage({
   searchParams,
 }: FakePaymentPageProps) {
-  const orderNumber = searchParams?.order || "не найден"
+  const params = searchParams ? await searchParams : undefined
+  const orderNumber =
+    typeof params?.order === "string" && params.order.trim()
+      ? params.order.trim()
+      : "не найден"
 
   return (
     <main className="min-h-screen bg-neutral-50 px-6 py-12 text-neutral-900">
