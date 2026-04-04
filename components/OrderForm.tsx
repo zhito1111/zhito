@@ -164,16 +164,37 @@ export default function OrderForm() {
     setError("")
     setSuccessMessage("")
 
-    const newItem: CartItem = {
-      id: `${product}-${volume}-${Date.now()}`,
-      product,
-      volume,
-      amount,
-      unitPrice: currentUnitPrice,
-      totalPrice: currentUnitPrice * amount,
-    }
+    setCartItems((prev) => {
+      const existingItem = prev.find(
+        (item) => item.product === product && item.volume === volume
+      )
 
-    setCartItems((prev) => [...prev, newItem])
+      if (existingItem) {
+        return prev.map((item) => {
+          if (item.id !== existingItem.id) return item
+
+          const nextAmount = item.amount + amount
+
+          return {
+            ...item,
+            amount: nextAmount,
+            totalPrice: nextAmount * item.unitPrice,
+          }
+        })
+      }
+
+      const newItem: CartItem = {
+        id: `${product}-${volume}-${Date.now()}`,
+        product,
+        volume,
+        amount,
+        unitPrice: currentUnitPrice,
+        totalPrice: currentUnitPrice * amount,
+      }
+
+      return [...prev, newItem]
+    })
+
     setAmount(1)
   }
 
