@@ -18,6 +18,26 @@ const catalog: Record<string, Record<string, number>> = {
     "500 мл": 1600,
     "1 л": 3000,
   },
+  "Кунжутное масло": {
+    "250 мл": 950,
+    "500 мл": 1700,
+    "1 л": 3200,
+  },
+  "Масло расторопши": {
+    "250 мл": 800,
+    "500 мл": 1400,
+    "1 л": 2600,
+  },
+  "Кокосовое масло": {
+    "250 мл": 600,
+    "500 мл": 1100,
+    "1 л": 2000,
+  },
+  "Масло чёрного тмина": {
+    "250 мл": 1200,
+    "500 мл": 2100,
+    "1 л": 3900,
+  },
 }
 
 const productDescriptions: Record<string, string> = {
@@ -27,6 +47,14 @@ const productDescriptions: Record<string, string> = {
     "Мягкий и понятный вкус на каждый день. Хорошо подходит для привычного питания и свежих блюд.",
   "Тыквенное масло":
     "Более насыщенный вкус и аромат. Часто выбирают для салатов, овощных блюд и разнообразия рациона.",
+  "Кунжутное масло":
+    "Насыщенный ореховый вкус. Часто используют в азиатских блюдах и для ярких салатов.",
+  "Масло расторопши":
+    "Выбирают для поддержки рациона и мягкого повседневного использования.",
+  "Кокосовое масло":
+    "Лёгкий вкус и универсальность. Подходит как для еды, так и для добавления в напитки.",
+  "Масло чёрного тмина":
+    "Интенсивный вкус. Часто берут как функциональное масло в небольших объёмах.",
 }
 
 type CartItem = {
@@ -489,9 +517,7 @@ export default function OrderForm() {
 
         <div className="rounded-3xl border border-neutral-200 bg-neutral-50 p-5">
           <div className="flex items-center justify-between gap-4">
-            <p className="text-sm font-semibold text-neutral-900">
-              Ваш заказ
-            </p>
+            <p className="text-sm font-semibold text-neutral-900">Ваш заказ</p>
             <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-neutral-700 shadow-sm">
               {cartItems.length} поз.
             </span>
