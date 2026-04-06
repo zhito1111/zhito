@@ -7,14 +7,19 @@ type CreatePaymentParams = {
   siteUrl?: string
 }
 
+type CreatePaymentResult = {
+  paymentId: string
+  paymentUrl: string
+  isFake: boolean
+}
+
 function normalizeSiteUrl(rawSiteUrl?: string) {
   const fallback = "http://localhost:3000"
-  const value = (rawSiteUrl || process.env.NEXT_PUBLIC_SITE_URL || fallback).replace(/\/+$/, "")
+  const value = (rawSiteUrl || process.env.NEXT_PUBLIC_SITE_URL || fallback).trim()
 
   try {
     const url = new URL(value)
 
-    // Для localhost всегда используем http, а не https
     if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
       url.protocol = "http:"
     }
@@ -25,18 +30,30 @@ function normalizeSiteUrl(rawSiteUrl?: string) {
   }
 }
 
+function buildSuccessUrl(siteUrl: string, orderNumber: string) {
+  return `${siteUrl}/success?order=${encodeURIComponent(orderNumber)}`
+}
+
 export async function createPayment({
   amount,
   orderNumber,
   description,
   siteUrl,
-}: CreatePaymentParams) {
+}: CreatePaymentParams): Promise<CreatePaymentResult> {
   const normalizedSiteUrl = normalizeSiteUrl(siteUrl)
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Некорректная сумма платежа")
+  }
+
+  if (!orderNumber || typeof orderNumber !== "string") {
+    throw new Error("Некорректный номер заказа")
+  }
 
   const shopId = process.env.YOOKASSA_SHOP_ID
   const secretKey = process.env.YOOKASSA_SECRET_KEY
 
-  // Пока нет реальных ключей — работаем через fake payment
+  // Fallback для локальной разработки или если ключи не заданы
   if (!shopId || !secretKey) {
     return {
       paymentId: `fake_${Date.now()}`,
@@ -48,41 +65,74 @@ export async function createPayment({
   const auth = Buffer.from(`${shopId}:${secretKey}`).toString("base64")
   const idempotenceKey = crypto.randomUUID()
 
-  const response = await fetch("https://api.yookassa.ru/v3/payments", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Basic ${auth}`,
-      "Idempotence-Key": idempotenceKey,
+  const payload = {
+    amount: {
+      value: amount.toFixed(2),
+      currency: "RUB",
     },
-    body: JSON.stringify({
-      amount: {
-        value: amount.toFixed(2),
-        currency: "RUB",
-      },
-      capture: true,
-      confirmation: {
-        type: "redirect",
-        return_url: `${normalizedSiteUrl}/success?order=${encodeURIComponent(orderNumber)}`,
-      },
-      description: description || `Оплата заказа ${orderNumber}`,
-      metadata: {
-        orderNumber,
-      },
-    }),
-    cache: "no-store",
-  })
+    capture: true,
+    confirmation: {
+      type: "redirect",
+      return_url: buildSuccessUrl(normalizedSiteUrl, orderNumber),
+    },
+    description: description || `Оплата заказа ${orderNumber}`,
+    metadata: {
+      orderNumber,
+      source: "zhito",
+      paid: "false",
+    },
+  }
 
-  const data = await response.json()
+  let response: Response
+
+  try {
+    response = await fetch("https://api.yookassa.ru/v3/payments", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Basic ${auth}`,
+        "Idempotence-Key": idempotenceKey,
+      },
+      body: JSON.stringify(payload),
+      cache: "no-store",
+    })
+  } catch (error) {
+    console.error("YOOKASSA NETWORK ERROR:", error)
+    throw new Error("Не удалось связаться с ЮKassa")
+  }
+
+  let data: any = null
+
+  try {
+    data = await response.json()
+  } catch (error) {
+    console.error("YOOKASSA INVALID JSON:", error)
+    throw new Error("ЮKassa вернула некорректный ответ")
+  }
 
   if (!response.ok) {
     console.error("YOOKASSA ERROR:", data)
-    throw new Error(data?.description || "Ошибка создания платежа в ЮKassa")
+
+    const errorMessage =
+      data?.description ||
+      data?.error ||
+      data?.type ||
+      "Ошибка создания платежа в ЮKassa"
+
+    throw new Error(errorMessage)
+  }
+
+  const paymentId = data?.id
+  const paymentUrl = data?.confirmation?.confirmation_url
+
+  if (!paymentId || !paymentUrl) {
+    console.error("YOOKASSA INVALID RESPONSE SHAPE:", data)
+    throw new Error("ЮKassa не вернула ссылку на оплату")
   }
 
   return {
-    paymentId: data.id as string,
-    paymentUrl: data.confirmation?.confirmation_url as string,
+    paymentId: String(paymentId),
+    paymentUrl: String(paymentUrl),
     isFake: false,
   }
 }

@@ -44,7 +44,7 @@ const catalog: Record<string, Record<string, number>> = {
 type OrderItemInput = {
   product: string
   volume: string
-  amount: number
+  amount: number | string
 }
 
 type NormalizedOrderItem = {
@@ -130,6 +130,33 @@ function isOrderItemInput(value: unknown): value is OrderItemInput {
   )
 }
 
+function normalizeItems(rawItems: OrderItemInput[]): NormalizedOrderItem[] {
+  return rawItems.map((item) => {
+    const product = String(item.product || "").trim()
+    const volume = String(item.volume || "").trim()
+    const amount = Number(item.amount)
+
+    if (!product || !volume || !Number.isFinite(amount) || amount < 1) {
+      throw new Error("Неверный товар, объём или количество")
+    }
+
+    const safeAmount = Math.floor(amount)
+    const unitPrice = catalog[product]?.[volume]
+
+    if (typeof unitPrice !== "number") {
+      throw new Error("Неверный товар, объём или количество")
+    }
+
+    return {
+      product,
+      volume,
+      amount: safeAmount,
+      unitPrice,
+      totalPrice: unitPrice * safeAmount,
+    }
+  })
+}
+
 export async function POST(req: Request) {
   try {
     const body: OrderRequestBody = await req.json()
@@ -142,7 +169,7 @@ export async function POST(req: Request) {
       ? body.items.filter(isOrderItemInput).map((item) => ({
           product: item.product,
           volume: item.volume,
-          amount: Number(item.amount),
+          amount: item.amount,
         }))
       : []
 
@@ -175,30 +202,22 @@ export async function POST(req: Request) {
       )
     }
 
-    const normalizedItems: NormalizedOrderItem[] = rawItems.map((item) => {
-      const product = String(item.product || "").trim()
-      const volume = String(item.volume || "").trim()
-      const amount = Math.max(1, Number(item.amount) || 1)
+    const normalizedItems = normalizeItems(rawItems)
 
-      const unitPrice = catalog[product]?.[volume]
-
-      if (!product || !volume || typeof unitPrice !== "number") {
-        throw new Error("Неверный товар, объём или количество")
-      }
-
-      return {
-        product,
-        volume,
-        amount,
-        unitPrice,
-        totalPrice: unitPrice * amount,
-      }
-    })
-
-    const totalPrice = normalizedItems.reduce<number>(
+    const totalPrice = normalizedItems.reduce(
       (sum, item) => sum + item.totalPrice,
       0
     )
+
+    if (!Number.isFinite(totalPrice) || totalPrice <= 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Некорректная сумма заказа",
+        },
+        { status: 400 }
+      )
+    }
 
     const orderNumber = Date.now().toString()
     const siteUrl = new URL(req.url).origin
@@ -231,12 +250,27 @@ export async function POST(req: Request) {
       .map((item) => `${item.product}, ${item.volume}, ${item.amount} шт.`)
       .join("; ")
 
-    const payment = await createPayment({
-      amount: totalPrice,
-      orderNumber: order.orderNumber,
-      description: `Заказ ${order.orderNumber}: ${paymentDescription}`,
-      siteUrl,
-    })
+    let payment
+
+    try {
+      payment = await createPayment({
+        amount: totalPrice,
+        orderNumber: order.orderNumber,
+        description: `Заказ ${order.orderNumber}: ${paymentDescription}`,
+        siteUrl,
+      })
+    } catch (paymentError) {
+      console.error("PAYMENT CREATE ERROR:", paymentError)
+
+      await prisma.order.update({
+        where: { id: order.id },
+        data: {
+          status: "payment_error",
+        },
+      })
+
+      throw paymentError
+    }
 
     console.log("PAYMENT CREATED:", payment)
 
@@ -251,6 +285,7 @@ export async function POST(req: Request) {
       data: {
         paymentId: payment.paymentId,
         paymentUrl: finalPaymentUrl,
+        status: payment.isFake ? "new" : "pending_payment",
       },
       include: {
         items: true,
@@ -281,7 +316,7 @@ export async function POST(req: Request) {
 ${itemsText}
 
 💰 <b>Итого:</b> ${updatedOrder.totalPrice} ₽
-📌 <b>Статус:</b> ${updatedOrder.status}
+📌 <b>Статус:</b> ${escapeHtml(updatedOrder.status)}
 
 💳 <b>Ссылка на оплату:</b>
 <a href="${safePaymentUrl}">Открыть оплату</a>
