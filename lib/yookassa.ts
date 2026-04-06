@@ -1,10 +1,18 @@
 import crypto from "crypto"
 
+type ReceiptItem = {
+  description: string
+  quantity: number
+  amount: number
+}
+
 type CreatePaymentParams = {
   amount: number
   orderNumber: string
   description?: string
   siteUrl?: string
+  phone: string
+  items: ReceiptItem[]
 }
 
 type CreatePaymentResult = {
@@ -34,11 +42,35 @@ function buildSuccessUrl(siteUrl: string, orderNumber: string) {
   return `${siteUrl}/success?order=${encodeURIComponent(orderNumber)}`
 }
 
+function normalizePhoneForReceipt(phone: string) {
+  const digits = String(phone || "").replace(/\D/g, "")
+
+  if (digits.length === 11 && digits.startsWith("8")) {
+    return `+7${digits.slice(1)}`
+  }
+
+  if (digits.length === 11 && digits.startsWith("7")) {
+    return `+${digits}`
+  }
+
+  if (digits.length === 10) {
+    return `+7${digits}`
+  }
+
+  throw new Error("Некорректный телефон для ЮKassa")
+}
+
+function roundToTwo(value: number) {
+  return Math.round(value * 100) / 100
+}
+
 export async function createPayment({
   amount,
   orderNumber,
   description,
   siteUrl,
+  phone,
+  items,
 }: CreatePaymentParams): Promise<CreatePaymentResult> {
   const normalizedSiteUrl = normalizeSiteUrl(siteUrl)
 
@@ -50,10 +82,56 @@ export async function createPayment({
     throw new Error("Некорректный номер заказа")
   }
 
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new Error("Для оплаты нужен хотя бы один товар")
+  }
+
+  const normalizedPhone = normalizePhoneForReceipt(phone)
+
+  const receiptItems = items.map((item) => {
+    const description = String(item.description || "").trim()
+    const quantity = Number(item.quantity)
+    const itemAmount = Number(item.amount)
+
+    if (!description) {
+      throw new Error("У товара отсутствует описание для чека")
+    }
+
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new Error("Некорректное количество товара для чека")
+    }
+
+    if (!Number.isFinite(itemAmount) || itemAmount <= 0) {
+      throw new Error("Некорректная сумма товара для чека")
+    }
+
+    return {
+      description,
+      quantity: quantity.toFixed(2),
+      amount: {
+        value: roundToTwo(itemAmount).toFixed(2),
+        currency: "RUB",
+      },
+      vat_code: 1,
+      payment_mode: "full_payment",
+      payment_subject: "commodity",
+    }
+  })
+
+  const receiptTotal = roundToTwo(
+    receiptItems.reduce((sum, item) => sum + Number(item.amount.value), 0)
+  )
+  const normalizedAmount = roundToTwo(amount)
+
+  if (receiptTotal !== normalizedAmount) {
+    throw new Error(
+      `Сумма чека (${receiptTotal.toFixed(2)}) не совпадает с суммой платежа (${normalizedAmount.toFixed(2)})`
+    )
+  }
+
   const shopId = process.env.YOOKASSA_SHOP_ID
   const secretKey = process.env.YOOKASSA_SECRET_KEY
 
-  // Fallback для локальной разработки или если ключи не заданы
   if (!shopId || !secretKey) {
     return {
       paymentId: `fake_${Date.now()}`,
@@ -67,7 +145,7 @@ export async function createPayment({
 
   const payload = {
     amount: {
-      value: amount.toFixed(2),
+      value: normalizedAmount.toFixed(2),
       currency: "RUB",
     },
     capture: true,
@@ -80,6 +158,13 @@ export async function createPayment({
       orderNumber,
       source: "zhito",
       paid: "false",
+    },
+    receipt: {
+      customer: {
+        phone: normalizedPhone,
+      },
+      tax_system_code: 2,
+      items: receiptItems,
     },
   }
 
@@ -112,6 +197,7 @@ export async function createPayment({
 
   if (!response.ok) {
     console.error("YOOKASSA ERROR:", data)
+    console.error("YOOKASSA PAYLOAD:", payload)
 
     const errorMessage =
       data?.description ||
