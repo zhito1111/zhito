@@ -1,9 +1,10 @@
 "use client"
 
+import { Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 
-export default function SuccessPage() {
+function SuccessContent() {
   const searchParams = useSearchParams()
   const orderNumber = searchParams.get("order")
 
@@ -23,7 +24,7 @@ export default function SuccessPage() {
         </p>
 
         <p className="text-xs text-neutral-500 mb-6">
-          Если вы уже оплатили — статус обновится автоматически.
+          Если вы уже оплатили, статус обновится автоматически.
         </p>
 
         <Link
@@ -34,5 +35,13 @@ export default function SuccessPage() {
         </Link>
       </div>
     </div>
+  )
+}
+
+export default function SuccessPage() {
+  return (
+    <Suspense fallback={<div className="p-10 text-center">Загрузка...</div>}>
+      <SuccessContent />
+    </Suspense>
   )
 }
