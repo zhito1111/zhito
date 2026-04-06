@@ -256,8 +256,14 @@ export async function POST(req: Request) {
       payment = await createPayment({
         amount: totalPrice,
         orderNumber: order.orderNumber,
+        phone,
         description: `Заказ ${order.orderNumber}: ${paymentDescription}`,
         siteUrl,
+        items: normalizedItems.map((item) => ({
+          description: `${item.product} ${item.volume}`,
+          quantity: item.amount,
+          amount: item.totalPrice,
+        })),
       })
     } catch (paymentError) {
       console.error("PAYMENT CREATE ERROR:", paymentError)
