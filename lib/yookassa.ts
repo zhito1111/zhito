@@ -42,6 +42,10 @@ function buildSuccessUrl(siteUrl: string, orderNumber: string) {
   return `${siteUrl}/success?order=${encodeURIComponent(orderNumber)}`
 }
 
+function buildWebhookUrl(siteUrl: string) {
+  return `${siteUrl}/api/yookassa/webhook`
+}
+
 function normalizePhoneForReceipt(phone: string) {
   const digits = String(phone || "").replace(/\D/g, "")
 
@@ -153,11 +157,11 @@ export async function createPayment({
       type: "redirect",
       return_url: buildSuccessUrl(normalizedSiteUrl, orderNumber),
     },
+    notification_url: buildWebhookUrl(normalizedSiteUrl),
     description: description || `Оплата заказа ${orderNumber}`,
     metadata: {
       orderNumber,
       source: "zhito",
-      paid: "false",
     },
     receipt: {
       customer: {

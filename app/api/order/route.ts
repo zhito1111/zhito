@@ -220,7 +220,8 @@ export async function POST(req: Request) {
     }
 
     const orderNumber = Date.now().toString()
-    const siteUrl = new URL(req.url).origin
+    const siteUrl =
+      process.env.NEXT_PUBLIC_SITE_URL?.trim() || new URL(req.url).origin
 
     const order = await prisma.order.create({
       data: {
