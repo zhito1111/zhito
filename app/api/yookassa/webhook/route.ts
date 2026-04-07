@@ -6,17 +6,22 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
 
-    console.log("YOOKASSA WEBHOOK:", body)
+    console.log("YOOKASSA WEBHOOK:", JSON.stringify(body, null, 2))
 
-    const paymentId = body?.object?.id
-    const status = body?.object?.status
-    const paid = body?.object?.paid
-    const orderNumber = body?.object?.metadata?.orderNumber
+    const event = body?.event
+    const payment = body?.object
 
+    const paymentId = payment?.id
+    const status = payment?.status
+    const paid = payment?.paid
+    const orderNumber = payment?.metadata?.orderNumber
+
+    // ❗ ВАЖНО: webhook может приходить без нужных данных
     if (!paymentId) {
-      return NextResponse.json({ success: false }, { status: 400 })
+      return NextResponse.json({ success: true })
     }
 
+    // 🔍 Ищем заказ
     const order =
       (orderNumber &&
         (await prisma.order.findUnique({
@@ -29,30 +34,35 @@ export async function POST(req: Request) {
       }))
 
     if (!order) {
+      console.warn("ORDER NOT FOUND FOR PAYMENT:", paymentId)
+      return NextResponse.json({ success: true })
+    }
+
+    // 🔁 Защита от повторных webhook (ЮKassa любит спамить)
+    if (order.status === "paid" && status === "succeeded") {
       return NextResponse.json({ success: true })
     }
 
     // ✅ УСПЕШНАЯ ОПЛАТА
-    if (status === "succeeded" && paid) {
-      if (order.status !== "paid") {
-        const updated = await prisma.order.update({
-          where: { id: order.id },
-          data: {
-            status: "paid",
-            paidAt: new Date(),
-          },
-          include: { items: true },
-        })
+    if (event === "payment.succeeded" || (status === "succeeded" && paid)) {
+      const updated = await prisma.order.update({
+        where: { id: order.id },
+        data: {
+          status: "paid",
+          paidAt: new Date(),
+        },
+        include: { items: true },
+      })
 
-        const itemsText = updated.items
-          .map(
-            (i, idx) =>
-              `${idx + 1}. ${i.product} (${i.volume}) × ${i.amount} = ${i.totalPrice} ₽`
-          )
-          .join("\n")
+      const itemsText = updated.items
+        .map(
+          (i, idx) =>
+            `${idx + 1}. ${i.product} (${i.volume}) × ${i.amount} = ${i.totalPrice} ₽`
+        )
+        .join("\n")
 
-        await sendTelegramMessage(
-          `✅ ОПЛАТА ПРОШЛА
+      await sendTelegramMessage(
+        `💰 ОПЛАТА ПОДТВЕРЖДЕНА
 
 Заказ: ${updated.orderNumber}
 Телефон: ${updated.phone}
@@ -60,12 +70,11 @@ export async function POST(req: Request) {
 ${itemsText}
 
 Итого: ${updated.totalPrice} ₽`
-        )
-      }
+      )
     }
 
-    // ❌ ОТМЕНА
-    if (status === "canceled") {
+    // ❌ ОТМЕНА ПЛАТЕЖА
+    if (event === "payment.canceled" || status === "canceled") {
       if (order.status !== "paid") {
         await prisma.order.update({
           where: { id: order.id },
@@ -74,13 +83,13 @@ ${itemsText}
       }
     }
 
+    // ❗ ВСЕГДА возвращаем 200
     return NextResponse.json({ success: true })
   } catch (e) {
     console.error("WEBHOOK ERROR:", e)
 
-    return NextResponse.json(
-      { success: false },
-      { status: 500 }
-    )
+    // ❗ Даже при ошибке лучше вернуть 200,
+    // чтобы ЮKassa не долбила webhook 100 раз
+    return NextResponse.json({ success: true })
   }
 }
