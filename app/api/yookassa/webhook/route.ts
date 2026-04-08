@@ -54,18 +54,27 @@ export async function POST(req: Request) {
         include: { items: true },
       })
 
-      const itemsText = updated.items
-        .map(
-          (i, idx) =>
-            `${idx + 1}. ${i.product} (${i.volume}) × ${i.amount} = ${i.totalPrice} ₽`
-        )
-        .join("\n")
+     const itemsText = updated.items
+  .map(
+    (i, idx) =>
+      `${idx + 1}. ${i.product} (${i.volume}) × ${i.amount} = ${i.totalPrice} ₽`
+  )
+  .join("\n")
 
-      await sendTelegramMessage(
-        `💰 ОПЛАТА ПОДТВЕРЖДЕНА
+await sendTelegramMessage(
+  `💰 <b>ОПЛАТА ПОДТВЕРЖДЕНА</b>
 
-Заказ: ${updated.orderNumber}
-Телефон: ${updated.phone}
+🧾 <b>Заказ:</b> ${updated.orderNumber}
+📞 <b>Телефон:</b> ${updated.phone}
+
+📦 <b>Состав:</b>
+${itemsText}
+
+💰 <b>Сумма:</b> ${updated.totalPrice} ₽
+
+🚚 <b>Действие:</b>
+Связаться с клиентом и согласовать доставку`
+)
 
 ${itemsText}
 
