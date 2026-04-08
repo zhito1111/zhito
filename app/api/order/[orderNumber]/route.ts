@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { sendTelegramMessage } from "@/lib/telegram"
 
 type Params = {
   params: Promise<{
@@ -84,6 +85,32 @@ export async function GET(_req: Request, { params }: Params) {
             },
             include: { items: true },
           })
+
+          const itemsText = order.items
+            .map(
+              (i, idx) =>
+                `${idx + 1}. ${i.product} (${i.volume}) × ${i.amount} = ${i.totalPrice} ₽`
+            )
+            .join("\n")
+
+          try {
+            await sendTelegramMessage(
+              `💰 <b>ОПЛАТА ПОДТВЕРЖДЕНА</b>
+
+🧾 <b>Заказ:</b> ${order.orderNumber}
+📞 <b>Телефон:</b> ${order.phone}
+
+📦 <b>Состав:</b>
+${itemsText}
+
+💰 <b>Сумма:</b> ${order.totalPrice} ₽
+
+🚚 <b>Действие:</b>
+Связаться с клиентом и согласовать доставку`
+            )
+          } catch (telegramError) {
+            console.error("TELEGRAM PAYMENT NOTIFY ERROR:", telegramError)
+          }
         }
 
         // ❌ ОТМЕНЕНО
