@@ -57,7 +57,7 @@ const oils = [
       "Для тех, кто любит мягкий вкус",
     ],
     prices: [
-      { volume: "250 мл", price: "500 ₽" },
+      { volume: "250 мл", price: "10 ₽" },
       { volume: "500 мл", price: "900 ₽" },
       { volume: "1 л", price: "1700 ₽" },
     ],
