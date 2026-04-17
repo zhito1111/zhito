@@ -57,7 +57,7 @@ const oils = [
       "Для тех, кто любит мягкий вкус",
     ],
     prices: [
-      { volume: "250 мл", price: "10 ₽" },
+      { volume: "250 мл", price: "500 ₽" },
       { volume: "500 мл", price: "900 ₽" },
       { volume: "1 л", price: "1700 ₽" },
     ],
@@ -212,7 +212,13 @@ export default function Home() {
       <section className="border-b border-neutral-200 bg-gradient-to-b from-amber-50 via-orange-50/40 to-neutral-50 px-4 py-10 sm:px-6 sm:py-14">
         <div className="mx-auto grid max-w-6xl gap-8 md:grid-cols-2 md:items-center md:gap-10">
           <div>
-            <span className="inline-flex rounded-full border border-amber-200 bg-white px-4 py-1 text-sm font-medium text-amber-700 shadow-sm">
+            <img
+              src="/logo.png"
+              alt="Zhito"
+              className="h-20 w-auto sm:h-24"
+            />
+
+            <span className="mt-5 inline-flex rounded-full border border-amber-200 bg-white px-4 py-1 text-sm font-medium text-amber-700 shadow-sm">
               Свежий отжим под заказ
             </span>
 
